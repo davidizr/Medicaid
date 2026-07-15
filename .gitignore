@@ -1,0 +1,28 @@
+# DuckDB temp files
+.tmp/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Microsoft Office temp files
+~$*
+~WRL*.tmp
+
+# Matplotlib cache
+.mplconfig/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Large generated plot directories
+norm_its_plots_*/
+
+# Generated deck outputs (rebuild with build_slides.py)
+medicaid_its_deck.pptx
+medicaid_its_utilization_rates.csv
+
+# Large source data — kept local (already backed up in Dropbox), too big for GitHub
+medicaid-provider-spending.csv
+medicaid_provider_spending_enhanced.csv

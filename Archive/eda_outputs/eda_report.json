@@ -1,0 +1,27 @@
+{
+  "input_file": "medicaid-provider-spending.csv",
+  "total_rows": 227083361,
+  "columns": [
+    "BILLING_PROVIDER_NPI_NUM",
+    "SERVICING_PROVIDER_NPI_NUM",
+    "HCPCS_CODE",
+    "CLAIM_FROM_MONTH",
+    "TOTAL_UNIQUE_BENEFICIARIES",
+    "TOTAL_CLAIMS",
+    "TOTAL_PAID"
+  ],
+  "missing_counts": {
+    "BILLING_PROVIDER_NPI_NUM": 0,
+    "SERVICING_PROVIDER_NPI_NUM": 9490345,
+    "HCPCS_CODE": 0,
+    "CLAIM_FROM_MONTH": 0,
+    "TOTAL_UNIQUE_BENEFICIARIES": 0,
+    "TOTAL_CLAIMS": 0,
+    "TOTAL_PAID": 0
+  },
+  "claim_month_min": "2018-01",
+  "claim_month_max": "2024-12",
+  "unique_claim_months": 84,
+  "unique_hcpcs_codes": 10881,
+  "sample_rows_for_eda": 100000
+}

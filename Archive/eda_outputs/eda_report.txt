@@ -1,0 +1,42 @@
+Medicaid Provider Spending EDA Summary
+========================================
+
+input_file: medicaid-provider-spending.csv
+total_rows: 227083361
+columns: ['BILLING_PROVIDER_NPI_NUM', 'SERVICING_PROVIDER_NPI_NUM', 'HCPCS_CODE', 'CLAIM_FROM_MONTH', 'TOTAL_UNIQUE_BENEFICIARIES', 'TOTAL_CLAIMS', 'TOTAL_PAID']
+missing_counts: {'BILLING_PROVIDER_NPI_NUM': 0, 'SERVICING_PROVIDER_NPI_NUM': 9490345, 'HCPCS_CODE': 0, 'CLAIM_FROM_MONTH': 0, 'TOTAL_UNIQUE_BENEFICIARIES': 0, 'TOTAL_CLAIMS': 0, 'TOTAL_PAID': 0}
+claim_month_min: 2018-01
+claim_month_max: 2024-12
+unique_claim_months: 84
+unique_hcpcs_codes: 10881
+sample_rows_for_eda: 100000
+
+Exact-moment numeric summary (mean/std/min/max):
+                    column     count        mean          std        min          max      zeros  negatives
+TOTAL_UNIQUE_BENEFICIARIES 227083361   49.840542   316.193269      12.00    159423.00        0.0        0.0
+              TOTAL_CLAIMS 227083361   82.901556  1021.246858      12.00   1607071.00        0.0        0.0
+                TOTAL_PAID 227083361 4815.688955 91195.119443 -183021.84 118887675.31 35502216.0     9239.0
+
+Sample-based quantiles:
+                    column  0.01  0.05  0.25    0.5   0.75       0.95       0.99
+TOTAL_UNIQUE_BENEFICIARIES  12.0  12.0  15.0  22.00   39.0   133.0000   413.0000
+              TOTAL_CLAIMS  12.0  13.0  18.0  28.00   54.0   218.0000   841.0000
+                TOTAL_PAID   0.0   0.0  85.8 616.43 1949.7 11610.8105 71653.3596
+
+Top 15 HCPCS by total paid:
+HCPCS_CODE     rows  TOTAL_UNIQUE_BENEFICIARIES_sum  TOTAL_CLAIMS_sum  TOTAL_PAID_sum
+     T1019   457916                      55702849.0      1100608370.0    1.227395e+11
+     T1015  2429393                     235393614.0       322233922.0    4.915267e+10
+     T2016    81288                       4389789.0        69000080.0    3.490494e+10
+     99213 13566914                     639378224.0       764306590.0    3.300283e+10
+     S5125   214380                      19413061.0       398071209.0    3.134219e+10
+     99214 11728025                     432874138.0       502480931.0    2.991386e+10
+     99284  3980198                     154899942.0       170705529.0    2.015178e+10
+     H2016    72289                       4214296.0        60739036.0    1.974779e+10
+     99283  3270001                     144272501.0       157926994.0    1.687500e+10
+     H2015   272463                      20834363.0       109877296.0    1.647057e+10
+     99285  2901462                      99843804.0       111002396.0    1.509720e+10
+     90837  1869501                      56881182.0       127195989.0    1.206759e+10
+     S5102    96905                       7491536.0       111095812.0    9.340780e+09
+     90834  1212542                      54295935.0       108817687.0    8.821622e+09
+     T2021   110852                       5412523.0        55550230.0    8.653525e+09
