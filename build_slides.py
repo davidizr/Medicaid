@@ -45,6 +45,12 @@ UTILIZATION_RATES_CSV = "medicaid_its_utilization_rates.csv"
 INTERVENTION_MONTH = "2021-03-01"          # ITS break point
 RATE_PER = 100_000                          # claims per N member-months
 
+# Months dropped from every series before fitting (COVID disruption, Mar-May
+# 2020).  Time terms still reflect true calendar spacing, so these are treated
+# as missing observations rather than shifting the timeline.  Set to [] to keep
+# them.
+EXCLUDE_MONTHS = ["2020-03", "2020-04", "2020-05"]
+
 # Enrollment months to replace with the average of two neighbours (reporting
 # errors).  April 2022 is a known ~104M spike vs ~93M on either side.
 ENROLLMENT_INTERPOLATION = {
@@ -176,13 +182,15 @@ def load_enrollment(path):
     return enrollment
 
 
-def build_series(claims, codes):
+def build_series(claims, codes, exclude_months=EXCLUDE_MONTHS):
     """Sum the given code columns into one monthly series, trimmed to the span
     between the first and last month with a non-zero count.
 
     Leading and trailing zero/NaN months are dropped (interior zeros are kept),
     so a code that was retired part-way through the window ends at its last
-    month of activity rather than trailing off into a long run of zeros."""
+    month of activity rather than trailing off into a long run of zeros.
+    Months listed in ``exclude_months`` (e.g. the COVID disruption) are then
+    removed as missing observations."""
     lookup = {str(c).strip().upper(): c for c in claims.columns}
     present = [lookup[str(c).strip().upper()] for c in codes if str(c).strip().upper() in lookup]
     if not present:
@@ -194,7 +202,11 @@ def build_series(claims, codes):
     nonzero = ts.index[ts["y"].fillna(0) > 0]
     if len(nonzero) == 0:
         return ts.iloc[0:0].copy()
-    return ts.loc[nonzero[0]:nonzero[-1]].reset_index(drop=True)
+    ts = ts.loc[nonzero[0]:nonzero[-1]].reset_index(drop=True)
+    if exclude_months:
+        drop = {pd.Timestamp(m).to_period("M") for m in exclude_months}
+        ts = ts[~ts["month"].dt.to_period("M").isin(drop)].reset_index(drop=True)
+    return ts
 
 # ============================ MODELS ========================================
 
@@ -557,6 +569,7 @@ def build_deck(
     utilization_rates_csv=UTILIZATION_RATES_CSV,
     intervention_month=INTERVENTION_MONTH,
     rate_per=RATE_PER,
+    exclude_months=EXCLUDE_MONTHS,
 ):
     """Build a deck with three slides per target.
 
@@ -592,7 +605,7 @@ def build_deck(
     for title, code, codes, is_agg in iter_targets(individual_codes, aggregates):
         agg_codes = codes if is_agg else None
         try:
-            ts = build_series(claims, codes)
+            ts = build_series(claims, codes, exclude_months=exclude_months)
             if ts.empty:
                 raise ValueError("no non-zero observations")
 
