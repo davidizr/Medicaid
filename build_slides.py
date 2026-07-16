@@ -177,8 +177,12 @@ def load_enrollment(path):
 
 
 def build_series(claims, codes):
-    """Sum the given code columns into one monthly series, trimmed to the
-    first month with a non-zero count."""
+    """Sum the given code columns into one monthly series, trimmed to the span
+    between the first and last month with a non-zero count.
+
+    Leading and trailing zero/NaN months are dropped (interior zeros are kept),
+    so a code that was retired part-way through the window ends at its last
+    month of activity rather than trailing off into a long run of zeros."""
     lookup = {str(c).strip().upper(): c for c in claims.columns}
     present = [lookup[str(c).strip().upper()] for c in codes if str(c).strip().upper() in lookup]
     if not present:
@@ -190,7 +194,7 @@ def build_series(claims, codes):
     nonzero = ts.index[ts["y"].fillna(0) > 0]
     if len(nonzero) == 0:
         return ts.iloc[0:0].copy()
-    return ts.loc[nonzero[0]:].reset_index(drop=True)
+    return ts.loc[nonzero[0]:nonzero[-1]].reset_index(drop=True)
 
 # ============================ MODELS ========================================
 
@@ -518,20 +522,64 @@ def add_quarterly_slide(prs, target_title, rates, rate_per=RATE_PER,
 
 # ============================ DRIVER ========================================
 
-def _targets():
-    """Yield (title, code, code_list, is_aggregate) for every configured target."""
-    for code, desc in INDIVIDUAL_CODES:
+def _normalize_individual(entry):
+    """Accept either "code" or (code, description)."""
+    if isinstance(entry, (tuple, list)):
+        code = str(entry[0]).strip()
+        desc = str(entry[1]).strip() if len(entry) > 1 and entry[1] else ""
+    else:
+        code = str(entry).strip()
+        desc = ""
+    return code, desc
+
+
+def iter_targets(individual_codes, aggregates):
+    """Yield (title, code, code_list, is_aggregate) for each target.
+
+    individual_codes : iterable of "code" or (code, description)
+    aggregates       : mapping of {display_name: [codes]}
+    """
+    for entry in individual_codes:
+        code, desc = _normalize_individual(entry)
         title = f"HCPCS {code}" + (f" – {desc}" if desc else "")
         yield title, code, [code], False
-    for name, codes in AGGREGATES.items():
+    for name, codes in aggregates.items():
         yield name, name, list(codes), True
 
 
-def build_deck():
-    claims = load_claims_pivot(CLAIMS_PATH)
-    enrollment = load_enrollment(ENROLLMENT_PATH)
+def build_deck(
+    individual_codes=None,
+    aggregates=None,
+    *,
+    claims_path=CLAIMS_PATH,
+    enrollment_path=ENROLLMENT_PATH,
+    output_pptx=OUTPUT_PPTX,
+    utilization_rates_csv=UTILIZATION_RATES_CSV,
+    intervention_month=INTERVENTION_MONTH,
+    rate_per=RATE_PER,
+):
+    """Build a deck with three slides per target.
 
-    intervention = pd.Timestamp(INTERVENTION_MONTH)
+    Pass ``individual_codes`` and/or ``aggregates`` to override the CONFIG block:
+
+        build_deck(
+            individual_codes=["75565", ("93000", "ECG")],
+            aggregates={"My aggregate": ["93241", "93242", "93243"]},
+            output_pptx="my_deck.pptx",
+        )
+
+    Leave an argument as ``None`` to fall back to the CONFIG defaults; pass an
+    empty list/dict to render none of that kind.
+    """
+    if individual_codes is None:
+        individual_codes = INDIVIDUAL_CODES
+    if aggregates is None:
+        aggregates = AGGREGATES
+
+    claims = load_claims_pivot(claims_path)
+    enrollment = load_enrollment(enrollment_path)
+
+    intervention = pd.Timestamp(intervention_month)
     intervention_quarter = f"{intervention.year}-Q{(intervention.month - 1) // 3 + 1}"
 
     prs = Presentation()
@@ -541,38 +589,38 @@ def build_deck():
     rate_frames = []
     skipped = []
     made = 0
-    for title, code, codes, is_agg in _targets():
+    for title, code, codes, is_agg in iter_targets(individual_codes, aggregates):
         agg_codes = codes if is_agg else None
         try:
             ts = build_series(claims, codes)
             if ts.empty:
                 raise ValueError("no non-zero observations")
 
-            fitted, poisson_model = fit_poisson(ts, enrollment, intervention, rate_per=RATE_PER)
-            rates = utilization_rates_by_period(fitted, code, rate_per=RATE_PER)
+            fitted, poisson_model = fit_poisson(ts, enrollment, intervention, rate_per=rate_per)
+            rates = utilization_rates_by_period(fitted, code, rate_per=rate_per)
             rates.insert(0, "target_title", title)
             rate_frames.append(rates)
 
             nb_ts, nb_model, nb_error = fitted, None, None
             try:
-                nb_ts, nb_model = fit_negative_binomial(fitted, intervention, rate_per=RATE_PER)
+                nb_ts, nb_model = fit_negative_binomial(fitted, intervention, rate_per=rate_per)
             except Exception as exc:  # NB can fail to converge for sparse series
                 nb_error = exc
 
             add_model_slide(
-                prs, f"Normalized Poisson ITS (per {RATE_PER:,} member-months): {title}",
+                prs, f"Normalized Poisson ITS (per {rate_per:,} member-months): {title}",
                 fitted, poisson_model, intervention,
-                f"Fitted Poisson ITS rate per {RATE_PER:,} member-months",
-                rate_per=RATE_PER, agg_codes=agg_codes,
+                f"Fitted Poisson ITS rate per {rate_per:,} member-months",
+                rate_per=rate_per, agg_codes=agg_codes,
             )
             add_model_slide(
-                prs, f"Normalized Negative Binomial ITS (per {RATE_PER:,} member-months): {title}",
+                prs, f"Normalized Negative Binomial ITS (per {rate_per:,} member-months): {title}",
                 nb_ts, nb_model, intervention,
-                f"Fitted Negative Binomial ITS rate per {RATE_PER:,} member-months",
-                rate_per=RATE_PER, agg_codes=agg_codes, error=nb_error,
+                f"Fitted Negative Binomial ITS rate per {rate_per:,} member-months",
+                rate_per=rate_per, agg_codes=agg_codes, error=nb_error,
             )
             add_quarterly_slide(
-                prs, title, rates, rate_per=RATE_PER,
+                prs, title, rates, rate_per=rate_per,
                 intervention_quarter=intervention_quarter,
                 intervention_year=intervention.year, agg_codes=agg_codes,
             )
@@ -580,16 +628,16 @@ def build_deck():
         except Exception as exc:
             skipped.append((title, str(exc)))
 
-    Path(OUTPUT_PPTX).parent.mkdir(parents=True, exist_ok=True)
-    prs.save(OUTPUT_PPTX)
+    Path(output_pptx).parent.mkdir(parents=True, exist_ok=True)
+    prs.save(output_pptx)
 
     rates_out = (pd.concat(rate_frames, ignore_index=True)
                  if rate_frames else pd.DataFrame(columns=["target_title"] + UTILIZATION_RATE_COLUMNS))
-    rates_out.to_csv(UTILIZATION_RATES_CSV, index=False)
+    rates_out.to_csv(utilization_rates_csv, index=False)
 
     return {
-        "output_pptx": OUTPUT_PPTX,
-        "utilization_rates_csv": UTILIZATION_RATES_CSV,
+        "output_pptx": output_pptx,
+        "utilization_rates_csv": utilization_rates_csv,
         "targets_rendered": made,
         "slides_created": made * 3,
         "skipped": skipped,
