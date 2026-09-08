@@ -359,7 +359,7 @@ def plot_quarterly_bars(rates, title, rate_per=RATE_PER, intervention_quarter=No
     ax.set_axisbelow(True)
     if intervention_quarter and intervention_quarter in set(df["period_label"]):
         pos = df.index[df["period_label"].eq(intervention_quarter)][0]
-        ax.axvline(pos - 0.5, color="#C44E52", linestyle=":", linewidth=1.6)
+        ax.axvline(pos + 0.5, color="#C44E52", linestyle=":", linewidth=1.6)
     y_max = float(np.nanmax(np.r_[y + upper, [0.0]]))
     ax.set_ylim(0, y_max * 1.10 if y_max > 0 else 1.0)
     fig.tight_layout()
